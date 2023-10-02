@@ -1,0 +1,245 @@
+import javafx.application.Application;
+import javafx.application.Platform;
+import javafx.concurrent.Task;
+import javafx.geometry.Pos;
+import javafx.scene.Scene;
+import javafx.scene.control.*;
+import javafx.scene.layout.*;
+import javafx.stage.Stage;
+import java.sql.Connection;
+import java.sql.DriverManager;
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
+import java.sql.SQLException;
+import java.util.Optional;
+
+public class MarketAppUI extends Application {
+
+    private static final String HOST = "localhost";
+    private static final String USER = "root";
+    private static final String PASS = "Qwerty#80085";
+    private static final String DATABASE_NAME = "PROJECT2";
+
+    private Connection conn;
+    private Stage primaryStage;
+
+    public static void main(String[] args) {
+        launch(args);
+    }
+
+    @Override
+    public void start(Stage primaryStage) {
+        this.primaryStage = primaryStage;
+        primaryStage.setTitle("Market App");
+
+        // Initialize database connection
+        Task<Connection> connectTask = new Task<>() {
+            @Override
+            protected Connection call() throws Exception {
+                return getConnection();
+            }
+        };
+
+        connectTask.setOnSucceeded(event -> {
+            conn = connectTask.getValue();
+            // Create the main UI and set it when the database connection is established
+            createUI(primaryStage);
+        });
+
+        Thread connectThread = new Thread(connectTask);
+        connectThread.start();
+
+        // Show loading spinner
+        StackPane loadingPane = new StackPane(new ProgressIndicator());
+        Scene loadingScene = new Scene(loadingPane, 400, 200);
+        primaryStage.setScene(loadingScene);
+        primaryStage.show();
+    }
+
+    private void createUI(Stage primaryStage) {
+    // Create the layout
+    BorderPane borderPane = new BorderPane();
+    borderPane.setPrefSize(800, 600);
+
+    // Create a menu
+    MenuBar menuBar = new MenuBar();
+    Menu menu = new Menu("Options");
+    MenuItem viewToMenuItem = new MenuItem("View Transactions To Market");
+    MenuItem viewFromMenuItem = new MenuItem("View Transactions From Market");
+    MenuItem exitMenuItem = new MenuItem("Exit");
+    menu.getItems().addAll(viewToMenuItem, viewFromMenuItem, new SeparatorMenuItem(), exitMenuItem);
+    menuBar.getMenus().add(menu);
+
+    // Create a TextArea for displaying information
+    TextArea textArea = new TextArea();
+    textArea.setEditable(false);
+
+    // Create buttons for Buy and Sell
+    Button buyButton = new Button("Buy Products");
+    Button sellButton = new Button("Sell Products");
+
+    // Create a VBox to hold the buttons and the shop selection
+    VBox buttonBox = new VBox(10);
+    buttonBox.setAlignment(Pos.CENTER);
+    buttonBox.getChildren().addAll(buyButton, sellButton);
+
+    // Create a ComboBox for shop selection
+    ComboBox<String> shopComboBox = new ComboBox<>();
+    shopComboBox.setPromptText("Select a shop");
+
+    // Add components to the layout
+    borderPane.setTop(menuBar);
+    borderPane.setCenter(textArea);
+
+    // Create a HBox to hold the buttons and the shop selection
+    HBox hbox = new HBox(20);
+    hbox.setAlignment(Pos.CENTER);
+    hbox.getChildren().addAll(shopComboBox, buttonBox);
+    borderPane.setBottom(hbox);
+
+    // Set actions for Buy and Sell buttons
+    buyButton.setOnAction(e -> buyProducts(textArea, shopComboBox.getValue()));
+    sellButton.setOnAction(e -> sellProducts(textArea, shopComboBox.getValue()));
+
+    // Populate shopComboBox with shop names from the database
+    populateShopComboBox(shopComboBox);
+
+    // Set up the view transactions menu items
+    viewToMenuItem.setOnAction(e -> viewTransactionsToMarket(textArea, shopComboBox.getValue()));
+    viewFromMenuItem.setOnAction(e -> viewTransactionsFromMarket(textArea, shopComboBox.getValue()));
+
+    // Create a scene
+    Scene scene = new Scene(borderPane);
+
+    // Set the main UI scene
+    primaryStage.setScene(scene);
+}
+    
+   private void showAlert(Alert.AlertType alertType, String title, String content) {
+        Alert alert = new Alert(alertType);
+        alert.setTitle(title);
+        alert.setHeaderText(null);
+        alert.setContentText(content);
+        alert.showAndWait();
+    }
+
+    private void buyProducts(TextArea textArea, String selectedShop) {
+        // Create a dialog to select a shop to buy from
+        Dialog<String> dialog = new Dialog<>();
+        dialog.setTitle("Buy Products");
+        dialog.setHeaderText("Enter product details to buy from " + selectedShop);
+
+        ButtonType buyButtonType = new ButtonType("Buy", ButtonBar.ButtonData.OK_DONE);
+        dialog.getDialogPane().getButtonTypes().addAll(buyButtonType, ButtonType.CANCEL);
+
+        GridPane grid = new GridPane();
+        grid.setHgap(10);
+        grid.setVgap(10);
+
+        TextField productNameField = new TextField();
+        TextField quantityField = new TextField();
+
+        grid.add(new Label("Product Name:"), 0, 0);
+        grid.add(productNameField, 1, 0);
+        grid.add(new Label("Quantity:"), 0, 1);
+        grid.add(quantityField, 1, 1);
+
+        dialog.getDialogPane().setContent(grid);
+
+        dialog.setResultConverter(dialogButton -> {
+            if (dialogButton == buyButtonType) {
+                String productName = productNameField.getText();
+                int quantity = Integer.parseInt(quantityField.getText()); // Convert to int
+                try {
+                    int remainingQuantity = orderProductFromMarket(conn, selectedShop, productName, quantity);
+                    textArea.appendText("Ordered " + quantity + " " + productName + " from " + selectedShop +
+                            ". Remaining Quantity: " + remainingQuantity + "\n");
+                } catch (SQLException e) {
+                    handleSQLException(e);
+                }
+            }
+            return null;
+        });
+
+        dialog.showAndWait();
+    }
+
+    private void sellProducts(TextArea textArea, String selectedShop) {
+        // Create a dialog to select a shop to sell to
+        Dialog<String> dialog = new Dialog<>();
+        dialog.setTitle("Sell Products");
+        dialog.setHeaderText("Enter product details to sell to " + selectedShop);
+
+        ButtonType sellButtonType = new ButtonType("Sell", ButtonBar.ButtonData.OK_DONE);
+        dialog.getDialogPane().getButtonTypes().addAll(sellButtonType, ButtonType.CANCEL);
+
+        GridPane grid = new GridPane();
+        grid.setHgap(10);
+        grid.setVgap(10);
+
+        TextField productNameField = new TextField();
+        TextField quantityField = new TextField();
+
+        grid.add(new Label("Product Name:"), 0, 0);
+        grid.add(productNameField, 1, 0);
+        grid.add(new Label("Quantity:"), 0, 1);
+        grid.add(quantityField, 1, 1);
+
+        dialog.getDialogPane().setContent(grid);
+
+        dialog.setResultConverter(dialogButton -> {
+            if (dialogButton == sellButtonType) {
+                String productName = productNameField.getText();
+                int quantity = Integer.parseInt(quantityField.getText()); // Convert to int
+                try {
+                    int remainingQuantity = sellProductToMarket(conn, selectedShop, productName, quantity);
+                    textArea.appendText("Sold " + quantity + " " + productName + " to " + selectedShop +
+                            ". Remaining Quantity: " + remainingQuantity + "\n");
+                } catch (SQLException e) {
+                    handleSQLException(e);
+                }
+            }
+            return null;
+        });
+
+        dialog.showAndWait();
+    }
+
+    private void showShopProducts(String selectedShop, TextArea textArea) {
+        // Retrieve and display the products for the selected shop
+        // You can use a query to fetch products from the database for the selected shop
+        // and display them in the textArea
+        // Example query: SELECT product_name, quantity FROM products WHERE market = ?;
+        // Populate the textArea with the product names and quantities
+    }
+
+    private void populateShopComboBox(ComboBox<String> shopComboBox) {
+        // Fetch shop names from the database and populate the ComboBox
+        // You can use a query to fetch shop names from the database
+        // Example query: SELECT DISTINCT market FROM products;
+        // Populate the shopComboBox with the retrieved shop names
+    }
+
+    // ... (Rest of your code)
+
+    private int orderProductFromMarket(Connection conn, String market, String productName, int quantity) throws SQLException {
+        int remainingQuantity = 0;
+        // Your logic for ordering products from the market
+        return remainingQuantity;
+    }
+
+    private int sellProductToMarket(Connection conn, String market, String productName, int quantity) throws SQLException {
+        int remainingQuantity = 0;
+        // Your logic for selling products to the market
+        return remainingQuantity;
+    }
+
+    private Connection getConnection() throws SQLException {
+        return DriverManager.getConnection("jdbc:mysql://" + HOST + ":3306/" + DATABASE_NAME, USER, PASS);
+    }
+
+    private void handleSQLException(SQLException e) {
+        e.printStackTrace();
+        System.err.println("Database error: " + e.getMessage());
+    }
+}

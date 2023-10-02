@@ -1,0 +1,161 @@
+import javax.swing.*;
+import java.awt.*;
+import java.awt.event.ActionEvent;
+import java.awt.event.ActionListener;
+import java.sql.*;
+
+public class basegui {
+    private static final String HOST = "localhost";
+    private static final String USER = "root";
+    private static final String PASS = "Qwerty#80085";
+    private static final String DATABASE_NAME = "PROJECT2";
+
+    private JFrame frame;
+    private JPanel mainPanel;
+    private JComboBox<String> optionComboBox;
+    private JTextField productTextField;
+    private JTextArea outputTextArea;
+    private Connection conn;
+
+    public basegui() {
+        initializeDatabase();
+
+        frame = new JFrame("Market App");
+        frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
+        frame.setSize(400, 300);
+
+        mainPanel = new JPanel();
+        mainPanel.setLayout(new GridLayout(5, 2));
+
+        JLabel optionLabel = new JLabel("Select an option:");
+        String[] options = {"Buy Products", "Sell Products"};
+        optionComboBox = new JComboBox<>(options);
+
+        JLabel productLabel = new JLabel("Enter product name:");
+        productTextField = new JTextField();
+
+        JButton submitButton = new JButton("Submit");
+        submitButton.addActionListener(new ActionListener() {
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                performAction();
+            }
+        });
+
+        outputTextArea = new JTextArea();
+        outputTextArea.setEditable(false);
+
+        mainPanel.add(optionLabel);
+        mainPanel.add(optionComboBox);
+        mainPanel.add(productLabel);
+        mainPanel.add(productTextField);
+        mainPanel.add(new JLabel()); // Empty label for spacing
+        mainPanel.add(submitButton);
+        mainPanel.add(new JLabel()); // Empty label for spacing
+        mainPanel.add(new JScrollPane(outputTextArea));
+
+        frame.add(mainPanel);
+        frame.setVisible(true);
+    }
+
+    private void initializeDatabase() {
+        try {
+            conn = DriverManager.getConnection("jdbc:mysql://" + HOST + ":3306/" + DATABASE_NAME, USER, PASS);
+        } catch (SQLException e) {
+            JOptionPane.showMessageDialog(null, "Error connecting to the database: " + e.getMessage(), "Error", JOptionPane.ERROR_MESSAGE);
+            System.exit(1);
+        }
+    }
+
+    private void performAction() {
+        int option = optionComboBox.getSelectedIndex() + 1;
+        String productName = productTextField.getText();
+
+        if (productName.isEmpty()) {
+            JOptionPane.showMessageDialog(null, "Please enter a product name.", "Error", JOptionPane.ERROR_MESSAGE);
+            return;
+        }
+
+        String result = "";
+
+        try {
+            switch (option) {
+                case 1:
+                    result = buyProducts(productName);
+                    break;
+                case 2:
+                    result = sellProducts(productName);
+                    break;
+                default:
+                    result = "Invalid option.";
+            }
+        } catch (SQLException e) {
+            result = "Database error: " + e.getMessage();
+        }
+
+        outputTextArea.setText(result);
+    }
+
+    private String buyProducts(String productName) throws SQLException {
+        String[] markets = {"market1", "market2", "market3"};
+        StringBuilder result = new StringBuilder("Shops where " + productName + " is available:\n------------------------\n");
+
+        for (String market : markets) {
+            int availableQuantity = displayMarketInfo(market, productName);
+
+            if (availableQuantity > 0) {
+                result.append(market).append("\nAvailable Quantity: ").append(availableQuantity).append("\n\n");
+            }
+        }
+
+        if (result.toString().equals("Shops where " + productName + " is available:\n------------------------\n")) {
+            return "The product is not available in any shop.";
+        }
+
+        return result.toString();
+    }
+
+    private String sellProducts(String productName) throws SQLException {
+        String[] markets = {"market1", "market2", "market3"};
+        StringBuilder result = new StringBuilder("Shops where you can sell " + productName + ":\n------------------------\n");
+
+        for (String market : markets) {
+            int availableQuantity = displayMarketInfo(market, productName);
+
+            if (availableQuantity > 0) {
+                result.append(market).append("\nAvailable Quantity: ").append(availableQuantity).append("\n\n");
+            }
+        }
+
+        if (result.toString().equals("Shops where you can sell " + productName + ":\n------------------------\n")) {
+            return "You cannot sell the product to any shop.";
+        }
+
+        return result.toString();
+    }
+
+    private int displayMarketInfo(String market, String productName) throws SQLException {
+        String query = "SELECT * FROM " + market + " WHERE productname = ?";
+        int availableQuantity = 0;
+
+        try (PreparedStatement ps = conn.prepareStatement(query)) {
+            ps.setString(1, productName);
+
+            try (ResultSet rs = ps.executeQuery()) {
+                if (rs.next()) {
+                    availableQuantity = rs.getInt("quantity");
+                }
+            }
+        }
+
+        return availableQuantity;
+    }
+
+    public static void main(String[] args) {
+        SwingUtilities.invokeLater(new Runnable() {
+            public void run() {
+                new basegui();
+            }
+        });
+    }
+}

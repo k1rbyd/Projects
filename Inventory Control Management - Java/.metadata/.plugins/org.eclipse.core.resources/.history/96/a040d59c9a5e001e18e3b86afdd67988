@@ -1,0 +1,209 @@
+import java.sql.*;
+import java.util.Scanner;
+
+public class ShopApp {
+
+    private static final String HOST = "localhost";
+    private static final String USER = "root";
+    private static final String PASS = "Qwerty#80085";
+    private static final String DATABASE_NAME = "PROJECT2";
+
+    public static void main(String[] args) {
+        try {
+            Connection conn = getConnection();
+            if (conn != null) {
+                Scanner scanner = new Scanner(System.in);
+
+                System.out.println("Welcome to ShopApp!");
+                System.out.println("1. Buy Products");
+                System.out.println("2. Sell Products");
+                System.out.print("Select an option (1/2): ");
+                int option = scanner.nextInt();
+                scanner.nextLine(); // Consume the newline character
+
+                if (option == 1) {
+                    buyProducts(conn, scanner);
+                } else if (option == 2) {
+                    sellProducts(conn, scanner);
+                } else {
+                    System.out.println("Invalid option. Exiting...");
+                }
+
+                conn.close();
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+    }
+
+    private static Connection getConnection() {
+        try {
+            return DriverManager.getConnection("jdbc:mysql://" + HOST + ":3306/" + DATABASE_NAME, USER, PASS);
+        } catch (SQLException e) {
+            e.printStackTrace();
+            return null;
+        }
+    }
+
+    private static void buyProducts(Connection conn, Scanner scanner) {
+        System.out.print("Enter the product to search: ");
+        String productName = scanner.nextLine();
+
+        String[] shops = { "shop1", "shop2", "shop3" };
+
+        System.out.println("Shops where " + productName + " is available:");
+        System.out.println("------------------------");
+
+        boolean isAvailable = false;
+        for (String shop : shops) {
+            int availableQuantity = displayShopInfo(conn, shop, productName);
+            if (availableQuantity > 0) {
+                isAvailable = true;
+            }
+        }
+
+        if (!isAvailable) {
+            System.out.println("Sorry, " + productName + " is not available in any shop.");
+            System.out.println("Thank you for using ShopApp.");
+            return;
+        }
+
+        System.out.print("Enter the quantity required: ");
+        int requiredQuantity = scanner.nextInt();
+        scanner.nextLine(); // Consume the newline character
+
+        System.out.println("Shops where " + productName + " is available in the required quantity:");
+        System.out.println("------------------------");
+
+        for (String shop : shops) {
+            int availableQuantity = displayShopInfo(conn, shop, productName);
+            if (availableQuantity >= requiredQuantity) {
+                System.out.println(shop);
+                System.out.println("Available Quantity: " + availableQuantity);
+                System.out.println();
+            }
+        }
+
+        System.out.print("Enter the shop from which you want to purchase " + productName + ": ");
+        String selectedShop = scanner.nextLine();
+
+        if (!isShopValid(selectedShop, shops)) {
+            System.out.println("Invalid shop selection. Exiting...");
+            return;
+        }
+
+        int totalPrice = orderProductFromShop(conn, selectedShop, productName, requiredQuantity);
+        System.out.println("Ordered from " + selectedShop);
+        System.out.println("Total Price: $" + totalPrice);
+    }
+
+    private static void sellProducts(Connection conn, Scanner scanner) {
+        System.out.print("Enter the product to sell: ");
+        String productName = scanner.nextLine();
+
+        String[] shops = { "shop1", "shop2", "shop3" };
+
+        System.out.println("Shops where you can sell " + productName + ":");
+        System.out.println("------------------------");
+
+        boolean isAvailable = false;
+        for (String shop : shops) {
+            int availableQuantity = displayShopInfo(conn, shop, productName);
+            if (availableQuantity > 0) {
+                isAvailable = true;
+            }
+        }
+
+        if (!isAvailable) {
+            System.out.println("Sorry, " + productName + " cannot be sold in any shop.");
+            System.out.println("Thank you for using ShopApp.");
+            return;
+        }
+
+        System.out.print("Enter the quantity to sell: ");
+        int soldQuantity = scanner.nextInt();
+        scanner.nextLine(); // Consume the newline character
+
+        System.out.print("Enter the shop where you want to sell " + productName + ": ");
+        String selectedShop = scanner.nextLine();
+
+        if (!isShopValid(selectedShop, shops)) {
+            System.out.println("Invalid shop selection. Exiting...");
+            return;
+        }
+
+        int updatedQuantity = sellProductToShop(conn, selectedShop, productName, soldQuantity);
+        System.out.println("Sold to " + selectedShop);
+        System.out.println("Updated Quantity: " + updatedQuantity);
+    }
+
+    private static int displayShopInfo(Connection conn, String shop, String productName) {
+        String query = "SELECT * FROM " + shop + " WHERE productname = ?";
+        try (PreparedStatement ps = conn.prepareStatement(query)) {
+            ps.setString(1, productName);
+            try (ResultSet rs = ps.executeQuery()) {
+                if (rs.next()) {
+                    int quantity = rs.getInt("quantity");
+                    int price = rs.getInt("price");
+
+                    System.out.println(shop);
+                    System.out.println("Available Quantity: " + quantity);
+                    System.out.println("Price: $" + price);
+                    System.out.println();
+
+                    return quantity;
+                }
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        return 0; // Default quantity if not found
+    }
+
+    private static boolean isShopValid(String selectedShop, String[] shops) {
+        for (String shop : shops) {
+            if (shop.equalsIgnoreCase(selectedShop)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private static int orderProductFromShop(Connection conn, String shop, String productName, int quantity) {
+        // Implement the logic to place an order and calculate the total price here
+        // You can update the quantity and calculate the price based on your business logic
+        // For simplicity, let's assume a fixed price of $10 per unit
+        int pricePerUnit = 10;
+        int totalPrice = pricePerUnit * quantity;
+
+        // Update the quantity in the shop
+        String updateQuery = "UPDATE " + shop + " SET quantity = quantity - ? WHERE productname = ?";
+        try (PreparedStatement ps = conn.prepareStatement(updateQuery)) {
+            ps.setInt(1, quantity);
+            ps.setString(2, productName);
+            ps.executeUpdate();
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+
+        return totalPrice;
+    }
+
+    private static int sellProductToShop(Connection conn, String shop, String productName, int soldQuantity) {
+        // Implement the logic to sell a product and update the quantity here
+        // You can update the quantity based on your business logic
+        int updatedQuantity = -1; // Placeholder value, update accordingly
+
+        // Update the quantity in the shop
+        String updateQuery = "UPDATE " + shop + " SET quantity = quantity + ? WHERE productname = ?";
+        try (PreparedStatement ps = conn.prepareStatement(updateQuery)) {
+            ps.setInt(1, soldQuantity);
+            ps.setString(2, productName);
+            ps.executeUpdate();
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+
+        return updatedQuantity;
+    }
+}

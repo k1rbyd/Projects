@@ -1,0 +1,74 @@
+import javax.swing.*;
+import java.awt.*;
+import java.awt.event.ActionEvent;
+import java.awt.event.ActionListener;
+
+public class basegui {
+    private static final String HOST = "localhost";
+    private static final String USER = "root";
+    private static final String PASS = "Qwerty#80085";
+    private static final String DATABASE_NAME = "PROJECT2";
+
+    private JFrame frame;
+    private JComboBox<String> optionComboBox;
+    private JTextField productTextField;
+    private JTextArea outputTextArea;
+
+    public MarketAppGUI() {
+        frame = new JFrame("Market App");
+        frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
+        frame.setSize(400, 300);
+
+        JPanel mainPanel = new JPanel();
+        mainPanel.setLayout(new GridLayout(4, 2));
+
+        JLabel optionLabel = new JLabel("Select an option:");
+        String[] options = {"Buy Products", "Sell Products"};
+        optionComboBox = new JComboBox<>(options);
+
+        JLabel productLabel = new JLabel("Enter product name:");
+        productTextField = new JTextField();
+
+        JButton submitButton = new JButton("Submit");
+        submitButton.addActionListener(new ActionListener() {
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                performAction();
+            }
+        });
+
+        outputTextArea = new JTextArea();
+        outputTextArea.setEditable(false);
+
+        mainPanel.add(optionLabel);
+        mainPanel.add(optionComboBox);
+        mainPanel.add(productLabel);
+        mainPanel.add(productTextField);
+        mainPanel.add(new JLabel()); // Empty label for spacing
+        mainPanel.add(submitButton);
+        mainPanel.add(new JLabel()); // Empty label for spacing
+        mainPanel.add(new JScrollPane(outputTextArea));
+
+        frame.add(mainPanel);
+        frame.setVisible(true);
+    }
+
+    private void performAction() {
+        int option = optionComboBox.getSelectedIndex() + 1;
+        String productName = productTextField.getText();
+
+        // You can implement the logic to interact with the database and display results here
+
+        // For demonstration, let's display the selected option and product name
+        String result = "Option: " + optionComboBox.getSelectedItem() + "\nProduct: " + productName;
+        outputTextArea.setText(result);
+    }
+
+    public static void main(String[] args) {
+        SwingUtilities.invokeLater(new Runnable() {
+            public void run() {
+                new MarketAppGUI();
+            }
+        });
+    }
+}

@@ -1,0 +1,40 @@
+import java.sql.*;
+import javax.swing.*;
+import java.awt.*;
+import java.awt.event.ActionEvent;
+import java.awt.event.ActionListener;
+
+public class appui {
+    private static final String HOST = "localhost";
+    private static final String USER = "root";
+    private static final String PASS = "Qwerty#80085";
+
+    private JFrame frame;
+    private JTextField productTextField;
+    private JTextArea resultsTextArea;
+
+    public ShopSearchApp() {
+        initializeUI();
+    }
+
+    private void initializeUI() {
+        // Create and configure the UI components (JFrame, buttons, text fields, etc.)
+
+        // Add action listeners to handle button clicks
+
+        // Set up database connection and querying logic
+
+        // Display the UI
+    }
+
+    private void searchForProduct(String productName) {
+        // Implement the logic to search for the product in the shops' databases
+        // Display the results in the resultsTextArea
+    }
+
+    public static void main(String[] args) {
+        SwingUtilities.invokeLater(() -> {
+            new ShopSearchApp();
+        });
+    }
+}

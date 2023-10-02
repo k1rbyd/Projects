@@ -1,0 +1,300 @@
+import javax.swing.*;
+import java.awt.*;
+import java.awt.event.ActionEvent;
+import java.awt.event.ActionListener;
+import java.sql.Connection;
+import java.sql.DriverManager;
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
+import java.sql.SQLException;
+
+public class MarketApp {
+    private static final String HOST = "localhost";
+    private static final String USER = "root";
+    private static final String PASS = "Qwerty#80085";
+    private static final String DATABASE_NAME = "PROJECT2";
+
+    private Connection conn;
+    private JTextArea quantityTextArea;
+    private JTextArea outputTextArea;
+
+    private JFrame frame;
+    private JComboBox<String> actionComboBox;
+    private JTextField productTextField;
+    private JComboBox<String> marketComboBox;
+    private JTextField quantityTextField;
+
+    private boolean isBuying;
+
+    private static final String[] MARKETS = { "market1", "market2", "market3" };
+
+    public MarketApp() {
+        initDatabaseConnection();
+        initGUI();
+    }
+
+    private void initGUI() {
+        frame = new JFrame("Market App");
+        frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
+        frame.setSize(400, 350);
+
+        JPanel mainPanel = new JPanel();
+        mainPanel.setLayout(new BorderLayout());
+
+        JPanel topPanel = new JPanel(new GridLayout(6, 2));
+        JLabel actionLabel = new JLabel("Select an action:");
+        String[] actions = {"Buy", "Sell"};
+        actionComboBox = new JComboBox<>(actions);
+
+        JLabel productLabel = new JLabel("Enter product name:");
+        productTextField = new JTextField();
+
+        JLabel marketLabel = new JLabel("Select a market:");
+        marketComboBox = new JComboBox<>(getAvailableMarkets());
+
+        JLabel quantityLabel = new JLabel("Enter quantity:");
+        quantityTextField = new JTextField();
+
+        JLabel availableQuantitiesLabel = new JLabel("Available Quantities:");
+        quantityTextArea = new JTextArea();
+        quantityTextArea.setEditable(false);
+
+        JButton executeButton = new JButton("Execute Transaction");
+        JButton checkAvailabilityButton = new JButton("Check Product Availability");
+        JButton checkPriceButton = new JButton("Check Product Price");
+        JButton checkMarketButton = new JButton("Check Product Market");
+        JButton checkQuantityButton = new JButton("Check Product Quantity");
+        JButton checkStockButton = new JButton("Check Market Stock");
+
+        JPanel buttonPanel = new JPanel(new GridLayout(2, 3));
+        buttonPanel.add(checkAvailabilityButton);
+        buttonPanel.add(checkPriceButton);
+        buttonPanel.add(checkMarketButton);
+        buttonPanel.add(checkQuantityButton);
+        buttonPanel.add(checkStockButton);
+
+        topPanel.add(actionLabel);
+        topPanel.add(actionComboBox);
+        topPanel.add(productLabel);
+        topPanel.add(productTextField);
+        topPanel.add(marketLabel);
+        topPanel.add(marketComboBox);
+        topPanel.add(quantityLabel);
+        topPanel.add(quantityTextField);
+        topPanel.add(availableQuantitiesLabel);
+        topPanel.add(quantityTextArea);
+        topPanel.add(executeButton);
+
+        mainPanel.add(topPanel, BorderLayout.NORTH);
+        mainPanel.add(buttonPanel, BorderLayout.CENTER);
+
+        // Initialize outputTextArea
+        outputTextArea = new JTextArea();
+        outputTextArea.setEditable(false);
+        mainPanel.add(outputTextArea, BorderLayout.SOUTH);
+
+        frame.add(mainPanel);
+
+        // Action listener for the actionComboBox
+        actionComboBox.addActionListener(new ActionListener() {
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                String selectedAction = actionComboBox.getSelectedItem().toString();
+                if ("Buy".equals(selectedAction)) {
+                    isBuying = true;
+                    marketComboBox.setEnabled(false);
+                } else if ("Sell".equals(selectedAction)) {
+                    isBuying = false;
+                    marketComboBox.setEnabled(true);
+                }
+            }
+        });
+
+        executeButton.addActionListener(e -> {
+            String productName = productTextField.getText();
+            String selectedMarket = marketComboBox.getSelectedItem().toString();
+            int quantity = Integer.parseInt(quantityTextField.getText());
+
+            if (isBuying) {
+                processBuyRequest(productName, quantity, selectedMarket);
+            } else {
+                processSellRequest(productName, quantity, selectedMarket);
+            }
+        });
+
+        // Add action listeners for other buttons (checkAvailabilityButton, checkPriceButton, etc.)
+
+        frame.setVisible(true);
+    }
+
+    private void initDatabaseConnection() {
+        try {
+            conn = DriverManager.getConnection("jdbc:mysql://" + HOST + ":3306/" + DATABASE_NAME, USER, PASS);
+        } catch (SQLException e) {
+            e.printStackTrace();
+            System.err.println("Database connection error: " + e.getMessage());
+            System.exit(1);
+        }
+    }
+
+    private void addActionListener(AbstractButton button, ActionListener listener) {
+        button.addActionListener(listener);
+    }
+
+    private void processBuyRequest(String productName, int quantity, String selectedMarket) {
+        // Process buy request...
+        String query = "SELECT quantity FROM " + selectedMarket + " WHERE productname = ?";
+        try (PreparedStatement ps = conn.prepareStatement(query)) {
+            ps.setString(1, productName);
+            ResultSet rs = ps.executeQuery();
+            if (rs.next()) {
+                int availableQuantity = rs.getInt("quantity");
+                if (quantity <= availableQuantity) {
+                    int newQuantity = availableQuantity - quantity;
+                    updateDatabase(selectedMarket, productName, newQuantity);
+                    outputTextArea.setText("Bought " + quantity + " " + productName + " from " + selectedMarket);
+                } else {
+                    outputTextArea.setText("Not enough stock available in " + selectedMarket);
+                }
+            } else {
+                outputTextArea.setText(productName + " not found in " + selectedMarket);
+            }
+        } catch (SQLException e) {
+            handleSQLException(e);
+        }
+    }
+
+    private void processSellRequest(String productName, int quantity, String selectedMarket) {
+        // Process sell request...
+        String query = "SELECT quantity FROM " + selectedMarket + " WHERE productname = ?";
+        try (PreparedStatement ps = conn.prepareStatement(query)) {
+            ps.setString(1, productName);
+            ResultSet rs = ps.executeQuery();
+            if (rs.next()) {
+                int availableQuantity = rs.getInt("quantity");
+                int newQuantity = availableQuantity + quantity;
+                updateDatabase(selectedMarket, productName, newQuantity);
+                outputTextArea.setText("Sold " + quantity + " " + productName + " to " + selectedMarket);
+            } else {
+                outputTextArea.setText(productName + " not found in " + selectedMarket);
+            }
+        } catch (SQLException e) {
+            handleSQLException(e);
+        }
+    }
+
+    private void updateDatabase(String market, String productName, int newQuantity) {
+        // Update the database...
+        String updateQuery = "UPDATE " + market + " SET quantity = ? WHERE productname = ?";
+        try (PreparedStatement ps = conn.prepareStatement(updateQuery)) {
+            ps.setInt(1, newQuantity);
+            ps.setString(2, productName);
+            ps.executeUpdate();
+        } catch (SQLException e) {
+            handleSQLException(e);
+        }
+    }
+
+    private void checkAvailability(String productName, String selectedMarket) {
+        // Check availability...
+        String query = "SELECT quantity FROM " + selectedMarket + " WHERE productname = ?";
+        try (PreparedStatement ps = conn.prepareStatement(query)) {
+            ps.setString(1, productName);
+            ResultSet rs = ps.executeQuery();
+            if (rs.next()) {
+                int availableQuantity = rs.getInt("quantity");
+                outputTextArea.setText("Available quantity of " + productName + " in " + selectedMarket + ": " + availableQuantity);
+            } else {
+                outputTextArea.setText(productName + " not found in " + selectedMarket);
+            }
+        } catch (SQLException e) {
+            handleSQLException(e);
+        }
+    }
+
+    private void checkPrice(String productName, String selectedMarket) {
+        // Check price...
+        String query = "SELECT price FROM " + selectedMarket + " WHERE productname = ?";
+        try (PreparedStatement ps = conn.prepareStatement(query)) {
+            ps.setString(1, productName);
+            ResultSet rs = ps.executeQuery();
+            if (rs.next()) {
+                int price = rs.getInt("price");
+                outputTextArea.setText("Price of " + productName + " in " + selectedMarket + ": $" + price);
+            } else {
+                outputTextArea.setText(productName + " not found in " + selectedMarket);
+            }
+        } catch (SQLException e) {
+            handleSQLException(e);
+        }
+    }
+
+    private void checkMarket(String productName, String selectedMarket) {
+        // Check market...
+        String query = "SELECT * FROM " + selectedMarket + " WHERE productname = ?";
+        try (PreparedStatement ps = conn.prepareStatement(query)) {
+            ps.setString(1, productName);
+            ResultSet rs = ps.executeQuery();
+            if (rs.next()) {
+                int availableQuantity = rs.getInt("quantity");
+                int price = rs.getInt("price");
+                outputTextArea.setText("Product: " + productName + "\nMarket: " + selectedMarket + "\nAvailable Quantity: " + availableQuantity + "\nPrice: $" + price);
+            } else {
+                outputTextArea.setText(productName + " not found in " + selectedMarket);
+            }
+        } catch (SQLException e) {
+            handleSQLException(e);
+        }
+    }
+
+    private void checkQuantity(String productName, String selectedMarket) {
+        // Check quantity...
+        String query = "SELECT quantity FROM " + selectedMarket + " WHERE productname = ?";
+        try (PreparedStatement ps = conn.prepareStatement(query)) {
+            ps.setString(1, productName);
+            ResultSet rs = ps.executeQuery();
+            if (rs.next()) {
+                int availableQuantity = rs.getInt("quantity");
+                outputTextArea.setText("Available quantity of " + productName + " in " + selectedMarket + ": " + availableQuantity);
+            } else {
+                outputTextArea.setText(productName + " not found in " + selectedMarket);
+            }
+        } catch (SQLException e) {
+            handleSQLException(e);
+        }
+    }
+
+    private void checkStock(String selectedMarket) {
+        // Check stock...
+        String query = "SELECT * FROM " + selectedMarket;
+        try (PreparedStatement ps = conn.prepareStatement(query)) {
+            ResultSet rs = ps.executeQuery();
+            StringBuilder stockInfo = new StringBuilder();
+            stockInfo.append("Stock in ").append(selectedMarket).append(":\n");
+
+            while (rs.next()) {
+                String productName = rs.getString("productname");
+                int quantity = rs.getInt("quantity");
+                int price = rs.getInt("price");
+                stockInfo.append("Product: ").append(productName).append("\nQuantity: ").append(quantity).append("\nPrice: $").append(price).append("\n\n");
+            }
+            outputTextArea.setText(stockInfo.toString());
+        } catch (SQLException e) {
+            handleSQLException(e);
+        }
+    }
+
+    private String[] getAvailableMarkets() {
+        // Get available markets...
+        return MARKETS;
+    }
+
+    private void handleSQLException(SQLException e) {
+        e.printStackTrace();
+        outputTextArea.setText("Database error: " + e.getMessage());
+    }
+
+    public static void main(String[] args) {
+        SwingUtilities.invokeLater(MarketApp::new);
+    }
+}

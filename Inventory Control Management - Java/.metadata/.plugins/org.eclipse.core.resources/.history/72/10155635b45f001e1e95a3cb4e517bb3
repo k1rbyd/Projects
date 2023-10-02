@@ -1,0 +1,46 @@
+import javafx.application.Application;
+import javafx.scene.Scene;
+import javafx.scene.control.*;
+import javafx.scene.layout.*;
+import javafx.stage.Stage;
+import java.sql.Connection;
+
+public class MarketAppUI extends Application {
+    private MSC model;
+
+    public static void main(String[] args) {
+        launch(args);
+    }
+
+    @Override
+    public void start(Stage primaryStage) {
+        model = new MSC();
+
+        primaryStage.setTitle("MarketApp UI");
+        BorderPane borderPane = new BorderPane();
+
+        // Create UI components
+        VBox vbox = new VBox();
+        Label titleLabel = new Label("Welcome to MarketApp!");
+        Button buyButton = new Button("Buy Products");
+        Button sellButton = new Button("Sell Products");
+        Button viewToMarketButton = new Button("View Transactions To Market");
+        Button viewFromMarketButton = new Button("View Transactions From Market");
+        Button exitButton = new Button("Exit");
+
+        // Add components to the layout
+        vbox.getChildren().addAll(titleLabel, buyButton, sellButton, viewToMarketButton, viewFromMarketButton, exitButton);
+        borderPane.setCenter(vbox);
+
+        // Set event handlers
+        buyButton.setOnAction(e -> model.buyProducts(primaryStage));
+        sellButton.setOnAction(e -> model.sellProducts(primaryStage));
+        viewToMarketButton.setOnAction(e -> model.viewTransactionsToMarket(primaryStage));
+        viewFromMarketButton.setOnAction(e -> model.viewTransactionsFromMarket(primaryStage));
+        exitButton.setOnAction(e -> primaryStage.close());
+
+        Scene scene = new Scene(borderPane, 400, 300);
+        primaryStage.setScene(scene);
+        primaryStage.show();
+    }
+}

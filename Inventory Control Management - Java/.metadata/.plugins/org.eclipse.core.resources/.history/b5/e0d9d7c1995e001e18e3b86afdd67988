@@ -1,0 +1,136 @@
+import java.sql.*;
+import java.util.Scanner;
+
+public class ShopSearchApp {
+
+    private static final String HOST = "localhost";
+    private static final String USER = "root";
+    private static final String PASS = "Qwerty#80085";
+    private static final String DATABASE_NAME = "PROJECT2";
+
+    public static void main(String[] args) {
+        try {
+            Connection conn = getConnection();
+            if (conn != null) {
+                Scanner scanner = new Scanner(System.in);
+
+                System.out.print("Enter the product to search: ");
+                String productName = scanner.nextLine();
+
+                System.out.print("Enter the quantity required: ");
+                int requiredQuantity = scanner.nextInt();
+
+                String[] shops = { "shop1", "shop2", "shop3" };
+
+                boolean isAvailable = false;
+                int availableQuantity = 0;
+                String availableShop = "";
+
+                for (String shop : shops) {
+                    availableQuantity = displayShopInfo(conn, shop, productName);
+                    if (availableQuantity >= requiredQuantity) {
+                        isAvailable = true;
+                        availableShop = shop;
+                        break;
+                    }
+                }
+
+                if (isAvailable) {
+                    System.out.print("Product is available in " + availableShop + ". Do you want to order? (yes/no): ");
+                    String orderChoice = scanner.next();
+                    if ("yes".equalsIgnoreCase(orderChoice)) {
+                        int totalPrice = orderProductFromShop(conn, availableShop, productName, requiredQuantity);
+                        System.out.println("Ordered from " + availableShop);
+                        System.out.println("Total Price: $" + totalPrice);
+                    } else {
+                        System.out.println("Thank you for using ShopSearchApp.");
+                    }
+                } else {
+                    String highestQuantityShop = findHighestQuantityShop(conn, shops, productName);
+                    System.out.println("Product is not available in the required quantity.");
+                    System.out.println("Highest quantity available in " + highestQuantityShop + ": " + availableQuantity);
+                    System.out.print("Do you want to order in advance? (yes/no): ");
+                    String orderAdvanceChoice = scanner.next();
+                    if ("yes".equalsIgnoreCase(orderAdvanceChoice)) {
+                        int totalPrice = orderProductFromShop(conn, highestQuantityShop, productName, requiredQuantity);
+                        System.out.println("Ordered in advance from " + highestQuantityShop);
+                        System.out.println("Total Price: $" + totalPrice);
+                    } else {
+                        System.out.println("Thank you for using ShopSearchApp.");
+                    }
+                }
+
+                conn.close();
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+    }
+
+    private static Connection getConnection() {
+        try {
+            return DriverManager.getConnection("jdbc:mysql://" + HOST + ":3306/" + DATABASE_NAME, USER, PASS);
+        } catch (SQLException e) {
+            e.printStackTrace();
+            return null;
+        }
+    }
+
+    private static int displayShopInfo(Connection conn, String shop, String productName) {
+        String query = "SELECT * FROM " + shop + " WHERE productname = ?";
+        try (PreparedStatement ps = conn.prepareStatement(query)) {
+            ps.setString(1, productName);
+            try (ResultSet rs = ps.executeQuery()) {
+                if (rs.next()) {
+                    int quantity = rs.getInt("quantity");
+                    int price = rs.getInt("price");
+
+                    System.out.println(shop);
+                    System.out.println("Available Quantity: " + quantity);
+                    System.out.println("Price: $" + price);
+                    System.out.println();
+
+                    return quantity;
+                }
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        return 0; // Default quantity if not found
+    }
+
+    private static String findHighestQuantityShop(Connection conn, String[] shops, String productName) {
+        String highestQuantityShop = "";
+        int highestQuantity = 0;
+
+        for (String shop : shops) {
+            int availableQuantity = displayShopInfo(conn, shop, productName);
+            if (availableQuantity > highestQuantity) {
+                highestQuantity = availableQuantity;
+                highestQuantityShop = shop;
+            }
+        }
+
+        return highestQuantityShop;
+    }
+
+    private static int orderProductFromShop(Connection conn, String shop, String productName, int quantity) {
+        // Implement the logic to place an order and calculate the total price here
+        // You can update the quantity and calculate the price based on your business logic
+        // For simplicity, let's assume a fixed price of $10 per unit
+        int pricePerUnit = 10;
+        int totalPrice = pricePerUnit * quantity;
+
+        // Update the quantity in the shop
+        String updateQuery = "UPDATE " + shop + " SET quantity = quantity - ? WHERE productname = ?";
+        try (PreparedStatement ps = conn.prepareStatement(updateQuery)) {
+            ps.setInt(1, quantity);
+            ps.setString(2, productName);
+            ps.executeUpdate();
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+
+        return totalPrice;
+    }
+}

@@ -1,0 +1,96 @@
+import javax.swing.*;
+import java.awt.*;
+import java.awt.event.ActionEvent;
+import java.awt.event.ActionListener;
+
+public class View {
+    private JFrame frame;
+    private JPanel mainPanel;
+    private JComboBox<String> optionComboBox;
+    private JTextField productTextField;
+    private JTextArea outputTextArea;
+
+    public View() {
+        frame = new JFrame("Market App");
+        frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
+        frame.setSize(400, 300);
+
+        mainPanel = new JPanel();
+        mainPanel.setLayout(new GridLayout(5, 2));
+
+        JLabel optionLabel = new JLabel("Select an option:");
+        String[] options = {"Buy Products", "Sell Products"};
+        optionComboBox = new JComboBox<>(options);
+
+        JLabel productLabel = new JLabel("Enter product name:");
+        productTextField = new JTextField();
+        JButton clearButton = new JButton("Clear");
+
+        JButton submitButton = new JButton("Submit");
+        mainPanel.add(new JLabel()); // Empty label for spacing
+
+        clearButton.addActionListener(new ActionListener() {
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                outputTextArea.setText("");
+            }
+        });
+
+        submitButton.addActionListener(new ActionListener() {
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                // Add action to perform when the "Submit" button is clicked
+                // You can call a method in your Controller class here.
+            }
+        });
+
+        outputTextArea = new JTextArea();
+        outputTextArea.setEditable(false);
+
+        mainPanel.add(optionLabel);
+        mainPanel.add(optionComboBox);
+        mainPanel.add(productLabel);
+        mainPanel.add(productTextField);
+        mainPanel.add(clearButton);
+        mainPanel.add(submitButton);
+        mainPanel.add(new JLabel()); // Empty label for spacing
+        mainPanel.add(new JScrollPane(outputTextArea));
+
+        mainPanel.setLayout(new FlowLayout(FlowLayout.LEFT));
+
+        frame.add(mainPanel);
+        frame.setVisible(true);
+    }
+
+    public String getSelectedOption() {
+        return optionComboBox.getSelectedItem().toString();
+    }
+
+    public String getProductInput() {
+        String productName = productTextField.getText();
+        if (productName == null || productName.isEmpty()) {
+            throw new IllegalArgumentException("Invalid product name.");
+        }
+        return productName;
+    }
+
+    public void setOutputText(String text) {
+        outputTextArea.setText(text);
+    }
+
+    public void addActionListener(ActionListener listener) {
+        optionComboBox.addActionListener(listener);
+    }
+
+    public void addSubmitActionListener(ActionListener listener) {
+        // Add an ActionListener for the "Submit" button
+    }
+
+    public static void main(String[] args) {
+        SwingUtilities.invokeLater(new Runnable() {
+            public void run() {
+                new View();
+            }
+        });
+    }
+}

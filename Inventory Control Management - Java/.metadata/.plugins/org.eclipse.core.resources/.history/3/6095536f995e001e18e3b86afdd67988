@@ -1,0 +1,109 @@
+import java.sql.*;
+import java.util.Scanner;
+
+public class base {
+
+    private static final String HOST = "localhost";
+    private static final String USER = "root";
+    private static final String PASS = "Qwerty#80085";
+    private static final String DATABASE_NAME = "PROJECT2";
+
+    public static void main(String[] args) {
+        try {
+            Connection conn = getConnection();
+            if (conn != null) {
+                Scanner scanner = new Scanner(System.in);
+
+                System.out.print("Enter the product to search: ");
+                String productName = scanner.nextLine();
+
+                System.out.print("Enter the quantity required: ");
+                int requiredQuantity = scanner.nextInt();
+
+                String[] shops = { "shop1", "shop2", "shop3" };
+
+                System.out.println("Shops where the product is available:");
+                System.out.println("------------------------------------");
+
+                boolean isAvailable = false;
+                for (String shop : shops) {
+                    int availableQuantity = displayShopInfo(conn, shop, productName);
+                    if (availableQuantity >= requiredQuantity) {
+                        isAvailable = true;
+                    }
+                }
+
+                if (!isAvailable) {
+                    System.out.println("Sorry, the required quantity is not available.");
+                } else {
+                    System.out.print("Do you want to order in advance? (yes/no): ");
+                    String orderInAdvance = scanner.next();
+                    if ("yes".equalsIgnoreCase(orderInAdvance)) {
+                        String nearestShop = findNearestShop(conn, shops, productName, requiredQuantity);
+                        if (nearestShop != null) {
+                            System.out.println("Ordered in advance from " + nearestShop);
+                        } else {
+                            System.out.println("No shop can fulfill the required quantity.");
+                        }
+                    } else {
+                        System.out.println("Thank you for using ShopSearchApp.");
+                    }
+                }
+
+                conn.close();
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+    }
+
+    private static Connection getConnection() {
+        try {
+            return DriverManager.getConnection("jdbc:mysql://" + HOST + ":3306/" + DATABASE_NAME, USER, PASS);
+        } catch (SQLException e) {
+            e.printStackTrace();
+            return null;
+        }
+    }
+
+    private static int displayShopInfo(Connection conn, String shop, String productName) {
+        String query = "SELECT * FROM " + shop + " WHERE productname = ?";
+        try (PreparedStatement ps = conn.prepareStatement(query)) {
+            ps.setString(1, productName);
+            try (ResultSet rs = ps.executeQuery()) {
+                if (rs.next()) {
+                    int quantity = rs.getInt("quantity");
+                    int price = rs.getInt("price");
+
+                    System.out.println(shop);
+                    System.out.println("Available Quantity: " + quantity);
+                    System.out.println("Price: $" + price);
+                    System.out.println();
+
+                    return quantity;
+                }
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        return 0; // Default quantity if not found
+    }
+
+    private static String findNearestShop(Connection conn, String[] shops, String productName, int requiredQuantity) {
+        String nearestShop = null;
+        int nearestQuantityDiff = Integer.MAX_VALUE;
+
+        for (String shop : shops) {
+            int availableQuantity = displayShopInfo(conn, shop, productName);
+            if (availableQuantity >= requiredQuantity) {
+                int quantityDiff = availableQuantity - requiredQuantity;
+                if (quantityDiff < nearestQuantityDiff) {
+                    nearestShop = shop;
+                    nearestQuantityDiff = quantityDiff;
+                }
+            }
+        }
+
+        return nearestShop;
+    }
+}

@@ -1,0 +1,226 @@
+import javax.swing.*;
+import java.awt.*;
+import java.awt.event.ActionEvent;
+import java.awt.event.ActionListener;
+import java.sql.Connection;
+import java.sql.DriverManager;
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
+import java.sql.SQLException;
+import java.util.ArrayList;
+import java.util.List;
+
+public class MarketApp {
+    private static final String HOST = "localhost";
+    private static final String USER = "root";
+    private static final String PASS = "Qwerty#80085";
+    private static final String DATABASE_NAME = "PROJECT2";
+    private Connection conn;
+    private JFrame frame;
+    private JComboBox<String> actionComboBox;
+    private JTextField productTextField;
+    private JComboBox<String> marketComboBox;
+    private JTextField quantityTextField;
+    private JTextArea outputTextArea;
+    private boolean isBuying;
+    private static final String[] MARKETS = { "market1", "market2", "market3" };
+    private List<String> transactionHistory = new ArrayList<>();
+
+    public MarketApp() {
+        establishDatabaseConnection();
+        createAndShowGUI();
+    }
+
+    private void establishDatabaseConnection() {
+        try {
+            conn = DriverManager.getConnection("jdbc:mysql://" + HOST + ":3306/" + DATABASE_NAME, USER, PASS);
+        } catch (SQLException e) {
+            e.printStackTrace();
+            System.err.println("Database connection error: " + e.getMessage());
+            System.exit(1);
+        }
+    }
+
+    private void createAndShowGUI() {
+        frame = new JFrame("Market App");
+        frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
+        frame.setSize(400, 450);
+
+        JPanel mainPanel = new JPanel();
+        mainPanel.setLayout(new BorderLayout());
+
+        JPanel topPanel = new JPanel(new GridLayout(6, 2));
+
+        JLabel actionLabel = new JLabel("Action:");
+        actionComboBox = new JComboBox<>(new String[] { "Buy", "Sell" });
+        JLabel productLabel = new JLabel("Product:");
+        productTextField = new JTextField();
+        JLabel marketLabel = new JLabel("Market:");
+        marketComboBox = new JComboBox<>(MARKETS);
+        JLabel quantityLabel = new JLabel("Quantity:");
+        quantityTextField = new JTextField();
+        topPanel.add(actionLabel);
+        topPanel.add(actionComboBox);
+        topPanel.add(productLabel);
+        topPanel.add(productTextField);
+        topPanel.add(marketLabel);
+        topPanel.add(marketComboBox);
+        topPanel.add(quantityLabel);
+        topPanel.add(quantityTextField);
+
+        JButton executeButton = new JButton("Execute Transaction");
+
+        JPanel buttonPanel = new JPanel(new GridLayout(2, 3));
+        buttonPanel.add(executeButton);
+
+        mainPanel.add(topPanel, BorderLayout.NORTH);
+        mainPanel.add(buttonPanel, BorderLayout.CENTER);
+
+        outputTextArea = new JTextArea();
+        outputTextArea.setEditable(false);
+
+        JScrollPane scrollPane = new JScrollPane(outputTextArea);
+        mainPanel.add(scrollPane, BorderLayout.CENTER);
+
+        JLabel profitLossLabel = new JLabel("Profit/Loss: $0.00");
+        mainPanel.add(profitLossLabel, BorderLayout.SOUTH);
+
+        frame.add(mainPanel);
+
+        executeButton.addActionListener(e -> {
+            String selectedAction = actionComboBox.getSelectedItem().toString();
+            String productName = productTextField.getText();
+            String selectedMarket = marketComboBox.getSelectedItem().toString();
+            int quantity = Integer.parseInt(quantityTextField.getText());
+
+            if ("Buy".equals(selectedAction)) {
+                processBuyRequest(productName, quantity, selectedMarket);
+            } else if ("Sell".equals(selectedAction)) {
+                processSellRequest(productName, quantity, selectedMarket);
+            }
+
+            // Display transaction details in the outputTextArea
+            outputTextArea.append(transactionHistory.get(transactionHistory.size() - 1) + "\n");
+
+            // Update the profit/loss label
+            double profitLoss = calculateProfitLoss();
+            profitLossLabel.setText("Profit/Loss: $" + String.format("%.2f", profitLoss));
+        });
+
+        frame.setVisible(true);
+    }
+
+    private void processBuyRequest(String productName, int quantity, String selectedMarket) {
+        try {
+            // Fetch the product price from the database
+            String query = "SELECT price FROM products WHERE name = ? AND market = ?";
+            PreparedStatement priceStmt = conn.prepareStatement(query);
+            priceStmt.setString(1, productName);
+            priceStmt.setString(2, selectedMarket);
+            ResultSet priceResult = priceStmt.executeQuery();
+
+            if (priceResult.next()) {
+                double productPrice = priceResult.getDouble("price");
+
+                // Calculate the cost
+                double costOfTransaction = productPrice * quantity;
+
+                // Check if there is enough quantity available to buy
+                String checkAvailabilityQuery = "SELECT quantity FROM products WHERE name = ? AND market = ?";
+                PreparedStatement checkStmt = conn.prepareStatement(checkAvailabilityQuery);
+                checkStmt.setString(1, productName);
+                checkStmt.setString(2, selectedMarket);
+                ResultSet availabilityResult = checkStmt.executeQuery();
+
+                if (availabilityResult.next()) {
+                    int availableQuantity = availabilityResult.getInt("quantity");
+                    if (availableQuantity >= quantity) {
+                        // Update the product's quantity in the database
+                        String updateQuery = "UPDATE products SET quantity = ? WHERE name = ? AND market = ?";
+                        PreparedStatement updateStmt = conn.prepareStatement(updateQuery);
+                        updateStmt.setInt(1, availableQuantity - quantity);
+                        updateStmt.setString(2, productName);
+                        updateStmt.setString(3, selectedMarket);
+                        updateStmt.executeUpdate();
+
+                        // Add transaction details to the history
+                        transactionHistory.add("Bought " + quantity + " " + productName + " from " + selectedMarket +
+                                " for $" + costOfTransaction);
+                    } else {
+                        outputTextArea.append("Error: Insufficient quantity available.\n");
+                    }
+                }
+            } else {
+                outputTextArea.append("Error: Product not found in the selected market.\n");
+            }
+        } catch (SQLException e) {
+            handleDatabaseException(e);
+        }
+    }
+
+    private void processSellRequest(String productName, int quantity, String selectedMarket) {
+        try {
+            // Fetch the product price from the database
+            String query = "SELECT price FROM products WHERE name = ? AND market = ?";
+            PreparedStatement priceStmt = conn.prepareStatement(query);
+            priceStmt.setString(1, productName);
+            priceStmt.setString(2, selectedMarket);
+            ResultSet priceResult = priceStmt.executeQuery();
+
+            if (priceResult.next()) {
+                double productPrice = priceResult.getDouble("price");
+
+                // Calculate the revenue
+                double revenueFromTransaction = productPrice * quantity;
+
+                // Update the product's quantity in the database
+                String updateQuery = "UPDATE products SET quantity = quantity + ? WHERE name = ? AND market = ?";
+                PreparedStatement updateStmt = conn.prepareStatement(updateQuery);
+                updateStmt.setInt(1, quantity);
+                updateStmt.setString(2, productName);
+                updateStmt.setString(3, selectedMarket);
+                updateStmt.executeUpdate();
+
+                // Add transaction details to the history
+                transactionHistory.add("Sold " + quantity + " " + productName + " to " + selectedMarket +
+                        " for $" + revenueFromTransaction);
+            } else {
+                outputTextArea.append("Error: Product not found in the selected market.\n");
+            }
+        } catch (SQLException e) {
+            handleDatabaseException(e);
+        }
+    }
+
+    private double calculateProfitLoss() {
+        // Implement your profit/loss calculation logic here based on transactions.
+        // You may need to maintain a data structure to track transactions.
+        double totalProfitLoss = 0.0;
+
+        // Sample code: Calculate profit/loss based on transactions
+        for (String transaction : transactionHistory) {
+            if (transaction.startsWith("Bought")) {
+                // Parse the cost of the transaction and subtract it from totalProfitLoss
+                String[] parts = transaction.split(" ");
+                double cost = Double.parseDouble(parts[parts.length - 1].replace("$", ""));
+                totalProfitLoss -= cost;
+            } else if (transaction.startsWith("Sold")) {
+                // Parse the revenue from the transaction and add it to totalProfitLoss
+                String[] parts = transaction.split(" ");
+                double revenue = Double.parseDouble(parts[parts.length - 1].replace("$", ""));
+                totalProfitLoss += revenue;
+            }
+        }
+
+        return totalProfitLoss;
+    }
+
+    private void handleDatabaseException(SQLException e) {
+        e.printStackTrace();
+        outputTextArea.setText("Database error: " + e.getMessage());
+    }
+
+    public static void main(String[] args) {
+        SwingUtilities.invokeLater(MarketApp::new);
+    }
+}

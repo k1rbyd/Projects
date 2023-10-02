@@ -1,0 +1,319 @@
+import javafx.application.Application;
+import javafx.concurrent.Task;
+import javafx.geometry.Pos;
+import javafx.scene.Scene;
+import javafx.scene.control.*;
+import javafx.scene.layout.*;
+import javafx.stage.Stage;
+
+import java.sql.Connection;
+import java.sql.DriverManager;
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
+import java.sql.SQLException;
+import java.util.Optional;
+
+public class MarketAppUI extends Application {
+
+    private static final String HOST = "localhost";
+    private static final String USER = "root";
+    private static final String PASS = "Qwerty#80085";
+    private static final String DATABASE_NAME = "PROJECT2";
+
+    private Connection conn;
+
+    public static void main(String[] args) {
+        launch(args);
+    }
+
+    @Override
+    public void start(Stage primaryStage) {
+        primaryStage.setTitle("Market App");
+
+        // Initialize database connection
+        Task<Connection> connectTask = new Task<>() {
+            @Override
+            protected Connection call() throws Exception {
+                return getConnection();
+            }
+        };
+
+        connectTask.setOnSucceeded(event -> {
+            conn = connectTask.getValue();
+            createUI(primaryStage);
+        });
+
+        connectTask.setOnFailed(event -> {
+            Exception exception = connectTask.getException();
+            if (exception != null) {
+                handleSQLException(exception);
+            }
+            showAlert(Alert.AlertType.ERROR, "Database Connection Error", "Unable to connect to the database.");
+            primaryStage.close();
+        });
+
+
+        Thread connectThread = new Thread(connectTask);
+        connectThread.start();
+
+        // Show loading spinner
+        StackPane loadingPane = new StackPane(new ProgressIndicator());
+        Scene loadingScene = new Scene(loadingPane, 400, 200);
+        primaryStage.setScene(loadingScene);
+        primaryStage.show();
+    }
+
+    private void createUI(Stage primaryStage) {
+        // Create the layout
+        BorderPane borderPane = new BorderPane();
+        borderPane.setPrefSize(800, 600);
+
+        // Create a menu
+        MenuBar menuBar = new MenuBar();
+        Menu menu = new Menu("Options");
+        MenuItem buyMenuItem = new MenuItem("Buy Products");
+        MenuItem sellMenuItem = new MenuItem("Sell Products");
+        MenuItem viewToMenuItem = new MenuItem("View Transactions To Market");
+        MenuItem viewFromMenuItem = new MenuItem("View Transactions From Market");
+        MenuItem exitMenuItem = new MenuItem("Exit");
+        menu.getItems().addAll(buyMenuItem, sellMenuItem, viewToMenuItem, viewFromMenuItem, new SeparatorMenuItem(), exitMenuItem);
+        menuBar.getMenus().add(menu);
+
+        // Create a TextArea for displaying information
+        TextArea textArea = new TextArea();
+        textArea.setEditable(false);
+
+        // Add components to the layout
+        borderPane.setTop(menuBar);
+        borderPane.setCenter(textArea);
+
+        // Create a scene
+        Scene scene = new Scene(borderPane);
+
+        // Set actions for menu items
+        buyMenuItem.setOnAction(e -> buyProducts(primaryStage, textArea));
+        sellMenuItem.setOnAction(e -> sellProducts(primaryStage, textArea));
+        viewToMenuItem.setOnAction(e -> viewTransactionsToMarket(textArea));
+        viewFromMenuItem.setOnAction(e -> viewTransactionsFromMarket(textArea));
+        exitMenuItem.setOnAction(e -> {
+            try {
+                conn.close();
+            } catch (SQLException ex) {
+                handleSQLException(ex);
+            }
+            primaryStage.close();
+        });
+
+        primaryStage.setScene(scene);
+        primaryStage.show();
+    }
+
+    private void showAlert(Alert.AlertType alertType, String title, String content) {
+        Alert alert = new Alert(alertType);
+        alert.setTitle(title);
+        alert.setHeaderText(null);
+        alert.setContentText(content);
+        alert.showAndWait();
+    }
+
+    private void buyProducts(Stage primaryStage, TextArea textArea) {
+        // Create a dialog to select a shop to buy from
+        ChoiceDialog<String> shopDialog = new ChoiceDialog<>("SelectedMarket", "Shop1", "Shop2", "Shop3");
+        shopDialog.setTitle("Select Shop");
+        shopDialog.setHeaderText("Select a shop to buy from:");
+        shopDialog.setContentText("Shop:");
+
+        Optional<String> selectedShop = shopDialog.showAndWait();
+        if (selectedShop.isPresent()) {
+            String selectedShopName = selectedShop.get();
+
+            Dialog<String> dialog = new Dialog<>();
+            dialog.setTitle("Buy Products");
+            dialog.setHeaderText("Enter product details to buy from " + selectedShopName);
+
+            ButtonType buyButtonType = new ButtonType("Buy", ButtonBar.ButtonData.OK_DONE);
+            dialog.getDialogPane().getButtonTypes().addAll(buyButtonType, ButtonType.CANCEL);
+
+            GridPane grid = new GridPane();
+            grid.setHgap(10);
+            grid.setVgap(10);
+
+            TextField productNameField = new TextField();
+            TextField quantityField = new TextField();
+
+            grid.add(new Label("Product Name:"), 0, 0);
+            grid.add(productNameField, 1, 0);
+            grid.add(new Label("Quantity:"), 0, 1);
+            grid.add(quantityField, 1, 1);
+
+            dialog.getDialogPane().setContent(grid);
+
+            dialog.setResultConverter(dialogButton -> {
+                if (dialogButton == buyButtonType) {
+                    String productName = productNameField.getText();
+                    int quantity = Integer.parseInt(quantityField.getText()); // Convert to int
+                    try {
+                        int totalPrice = orderProductFromMarket(conn, selectedShopName, productName, quantity);
+                        textArea.appendText("Ordered " + quantity + " " + productName + " from " + selectedShopName + ". Total Price: $" + totalPrice + "\n");
+                    } catch (SQLException e) {
+                        handleSQLException(e);
+                    }
+                }
+                return null;
+            });
+
+            dialog.showAndWait();
+        }
+    }
+
+    private void sellProducts(Stage primaryStage, TextArea textArea) {
+        // Create a dialog to select a shop to sell to
+        ChoiceDialog<String> shopDialog = new ChoiceDialog<>("SelectedMarket", "Shop1", "Shop2", "Shop3");
+        shopDialog.setTitle("Select Shop");
+        shopDialog.setHeaderText("Select a shop to sell to:");
+        shopDialog.setContentText("Shop:");
+
+        Optional<String> selectedShop = shopDialog.showAndWait();
+        if (selectedShop.isPresent()) {
+            String selectedShopName = selectedShop.get();
+
+            Dialog<String> dialog = new Dialog<>();
+            dialog.setTitle("Sell Products");
+            dialog.setHeaderText("Enter product details to sell to " + selectedShopName);
+
+            ButtonType sellButtonType = new ButtonType("Sell", ButtonBar.ButtonData.OK_DONE);
+            dialog.getDialogPane().getButtonTypes().addAll(sellButtonType, ButtonType.CANCEL);
+
+            GridPane grid = new GridPane();
+            grid.setHgap(10);
+            grid.setVgap(10);
+
+            TextField productNameField = new TextField();
+            TextField quantityField = new TextField();
+
+            grid.add(new Label("Product Name:"), 0, 0);
+            grid.add(productNameField, 1, 0);
+            grid.add(new Label("Quantity:"), 0, 1);
+            grid.add(quantityField, 1, 1);
+
+            dialog.getDialogPane().setContent(grid);
+
+            dialog.setResultConverter(dialogButton -> {
+                if (dialogButton == sellButtonType) {
+                    String productName = productNameField.getText();
+                    int quantity = Integer.parseInt(quantityField.getText()); // Convert to int
+                    try {
+                        int totalPrice = sellProductToMarket(conn, selectedShopName, productName, quantity);
+                        textArea.appendText("Sold " + quantity + " " + productName + " to " + selectedShopName + ". Total Price: $" + totalPrice + "\n");
+                    } catch (SQLException e) {
+                        handleSQLException(e);
+                    }
+                }
+                return null;
+            });
+
+            dialog.showAndWait();
+        }
+    }
+
+    private void viewTransactionsToMarket(TextArea textArea) {
+        Dialog<Void> dialog = new Dialog<>();
+        dialog.setTitle("View Transactions To Market");
+        dialog.setHeaderText("Transactions To Market");
+
+        ButtonType closeButton = new ButtonType("Close", ButtonBar.ButtonData.CANCEL_CLOSE);
+        dialog.getDialogPane().getButtonTypes().addAll(closeButton);
+
+        // Create a TextArea for displaying transactions
+        TextArea transactionsTextArea = new TextArea();
+        transactionsTextArea.setEditable(false);
+        transactionsTextArea.setPrefHeight(400); // Adjust the height as needed
+
+        // Retrieve and display transactions from the database
+        try {
+            String transactions = retrieveTransactionsFromDatabase("transactions_to_market");
+            transactionsTextArea.setText(transactions);
+        } catch (SQLException e) {
+            handleSQLException(e);
+        }
+
+        dialog.getDialogPane().setContent(transactionsTextArea);
+
+        dialog.setResultConverter(dialogButton -> null);
+
+        dialog.showAndWait();
+    }
+
+    private void viewTransactionsFromMarket(TextArea textArea) {
+        Dialog<Void> dialog = new Dialog<>();
+        dialog.setTitle("View Transactions From Market");
+        dialog.setHeaderText("Transactions From Market");
+
+        ButtonType closeButton = new ButtonType("Close", ButtonBar.ButtonData.CANCEL_CLOSE);
+        dialog.getDialogPane().getButtonTypes().addAll(closeButton);
+
+        // Create a TextArea for displaying transactions
+        TextArea transactionsTextArea = new TextArea();
+        transactionsTextArea.setEditable(false);
+        transactionsTextArea.setPrefHeight(400); // Adjust the height as needed
+
+        // Retrieve and display transactions from the database
+        try {
+            String transactions = retrieveTransactionsFromDatabase("transactions_from_market");
+            transactionsTextArea.setText(transactions);
+        } catch (SQLException e) {
+            handleSQLException(e);
+        }
+
+        dialog.getDialogPane().setContent(transactionsTextArea);
+
+        dialog.setResultConverter(dialogButton -> null);
+
+        dialog.showAndWait();
+    }
+
+    private String retrieveTransactionsFromDatabase(String tableName) throws SQLException {
+        StringBuilder transactions = new StringBuilder();
+
+        String query = "SELECT * FROM " + tableName;
+        try (PreparedStatement ps = conn.prepareStatement(query)) {
+            try (ResultSet rs = ps.executeQuery()) {
+                while (rs.next()) {
+                    int transactionId = rs.getInt("transaction_id");
+                    String productName = rs.getString("product_name");
+                    String marketName = rs.getString("market_name");
+                    int quantity = rs.getInt("quantity");
+                    int totalPrice = rs.getInt("total_price");
+
+                    transactions.append("Transaction ID: ").append(transactionId).append("\n");
+                    transactions.append("Product Name: ").append(productName).append("\n");
+                    transactions.append("Market Name: ").append(marketName).append("\n");
+                    transactions.append("Quantity: ").append(quantity).append("\n");
+                    transactions.append("Total Price: $").append(totalPrice).append("\n");
+                    transactions.append("\n");
+                }
+            }
+        }
+
+        return transactions.toString();
+    }
+
+    private Connection getConnection() throws SQLException {
+        return DriverManager.getConnection("jdbc:mysql://" + HOST + ":3306/" + DATABASE_NAME, USER, PASS);
+    }
+
+    private void handleSQLException(SQLException e) {
+        e.printStackTrace();
+        System.err.println("Database error: " + e.getMessage());
+    }
+
+    public static int orderProductFromMarket(Connection conn, String market, String productName, int quantity) throws SQLException {
+        int totalPrice = 10 * quantity; // Replace with your actual logic
+        return totalPrice;
+    }
+
+    public static int sellProductToMarket(Connection conn, String market, String productName, int quantity) throws SQLException {
+        int totalPrice = 8 * quantity; // Replace with your actual logic
+        return totalPrice;
+    }
+}

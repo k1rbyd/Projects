@@ -1,0 +1,108 @@
+import javafx.application.Application;
+import javafx.scene.Scene;
+import javafx.scene.control.*;
+import javafx.scene.layout.*;
+import javafx.stage.Stage;
+
+import java.sql.Connection;
+import java.sql.DriverManager;
+import java.sql.SQLException;
+import java.util.Optional;
+
+public class MarketAppUI extends Application {
+
+    private static final String HOST = "localhost";
+    private static final String USER = "root";
+    private static final String PASS = "Qwerty#80085";
+    private static final String DATABASE_NAME = "PROJECT2";
+
+    private Connection conn;
+
+    public static void main(String[] args) {
+        launch(args);
+    }
+
+    @Override
+    public void start(Stage primaryStage) {
+        primaryStage.setTitle("Market App");
+
+        // Initialize database connection
+        try {
+            conn = getConnection();
+        } catch (SQLException e) {
+            handleSQLException(e);
+        }
+
+        // Create the layout
+        BorderPane borderPane = new BorderPane();
+        borderPane.setPrefSize(800, 600);
+
+        // Create a menu
+        MenuBar menuBar = new MenuBar();
+        Menu menu = new Menu("Options");
+        MenuItem buyMenuItem = new MenuItem("Buy Products");
+        MenuItem sellMenuItem = new MenuItem("Sell Products");
+        MenuItem viewToMenuItem = new MenuItem("View Transactions To Market");
+        MenuItem viewFromMenuItem = new MenuItem("View Transactions From Market");
+        MenuItem exitMenuItem = new MenuItem("Exit");
+        menu.getItems().addAll(buyMenuItem, sellMenuItem, viewToMenuItem, viewFromMenuItem, new SeparatorMenuItem(), exitMenuItem);
+        menuBar.getMenus().add(menu);
+
+        // Create a TextArea for displaying information
+        TextArea textArea = new TextArea();
+        textArea.setEditable(false);
+
+        // Add components to the layout
+        borderPane.setTop(menuBar);
+        borderPane.setCenter(textArea);
+
+        // Create a scene
+        Scene scene = new Scene(borderPane);
+
+        // Set actions for menu items
+        buyMenuItem.setOnAction(e -> buyProducts(primaryStage, textArea));
+        sellMenuItem.setOnAction(e -> sellProducts(primaryStage, textArea));
+        viewToMenuItem.setOnAction(e -> viewTransactionsToMarket(textArea));
+        viewFromMenuItem.setOnAction(e -> viewTransactionsFromMarket(textArea));
+        exitMenuItem.setOnAction(e -> {
+            try {
+                conn.close();
+            } catch (SQLException ex) {
+                handleSQLException(ex);
+            }
+            primaryStage.close();
+        });
+
+        primaryStage.setScene(scene);
+        primaryStage.show();
+    }
+
+    private void buyProducts(Stage primaryStage, TextArea textArea) {
+        // Implement the buyProducts logic and update the textArea
+        // You can use dialogs or separate scenes for input and display
+    }
+
+    private void sellProducts(Stage primaryStage, TextArea textArea) {
+        // Implement the sellProducts logic and update the textArea
+        // You can use dialogs or separate scenes for input and display
+    }
+
+    private void viewTransactionsToMarket(TextArea textArea) {
+        // Implement the viewTransactionsToMarket logic and update the textArea
+        // You can use dialogs or separate scenes for display
+    }
+
+    private void viewTransactionsFromMarket(TextArea textArea) {
+        // Implement the viewTransactionsFromMarket logic and update the textArea
+        // You can use dialogs or separate scenes for display
+    }
+
+    public Connection getConnection() throws SQLException {
+        return DriverManager.getConnection("jdbc:mysql://" + HOST + ":3306/" + DATABASE_NAME, USER, PASS);
+    }
+
+    private void handleSQLException(SQLException e) {
+        e.printStackTrace();
+        System.err.println("Database error: " + e.getMessage());
+    }
+}

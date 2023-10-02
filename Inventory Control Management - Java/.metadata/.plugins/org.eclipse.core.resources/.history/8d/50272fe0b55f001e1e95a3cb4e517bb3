@@ -1,0 +1,112 @@
+import javafx.application.Application;
+import javafx.geometry.Insets;
+import javafx.scene.Scene;
+import javafx.scene.control.*;
+import javafx.scene.layout.*;
+import javafx.stage.Stage;
+
+import java.sql.Connection;
+import java.sql.DriverManager;
+import java.sql.SQLException;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.Optional;
+import java.util.Scanner;
+
+public class MarketAppUI extends Application {
+
+    // Your existing database and market constants here
+
+    private Connection conn;
+    private TextArea textArea;
+    private Scanner scanner;
+
+    public static void main(String[] args) {
+        launch(args);
+    }
+
+    @Override
+    public void start(Stage primaryStage) {
+        primaryStage.setTitle("Market App");
+
+        // Initialize database connection and scanner
+        try {
+            conn = getConnection();
+            scanner = new Scanner(System.in);
+        } catch (SQLException e) {
+            handleSQLException(e);
+        }
+
+        // Create the layout
+        BorderPane borderPane = new BorderPane();
+        borderPane.setPrefSize(800, 600);
+
+        // Create a menu
+        MenuBar menuBar = new MenuBar();
+        Menu menu = new Menu("Options");
+        MenuItem buyMenuItem = new MenuItem("Buy Products");
+        MenuItem sellMenuItem = new MenuItem("Sell Products");
+        MenuItem viewToMenuItem = new MenuItem("View Transactions To Market");
+        MenuItem viewFromMenuItem = new MenuItem("View Transactions From Market");
+        MenuItem exitMenuItem = new MenuItem("Exit");
+        menu.getItems().addAll(buyMenuItem, sellMenuItem, viewToMenuItem, viewFromMenuItem, new SeparatorMenuItem(), exitMenuItem);
+        menuBar.getMenus().add(menu);
+
+        // Create a TextArea for displaying information
+        textArea = new TextArea();
+        textArea.setEditable(false);
+
+        // Add components to the layout
+        borderPane.setTop(menuBar);
+        borderPane.setCenter(textArea);
+
+        // Create a scene
+        Scene scene = new Scene(borderPane);
+
+        // Set actions for menu items
+        buyMenuItem.setOnAction(e -> buyProducts());
+        sellMenuItem.setOnAction(e -> sellProducts());
+        viewToMenuItem.setOnAction(e -> viewTransactionsToMarket());
+        viewFromMenuItem.setOnAction(e -> viewTransactionsFromMarket());
+        exitMenuItem.setOnAction(e -> {
+            conn.close();
+            primaryStage.close();
+        });
+
+        primaryStage.setScene(scene);
+        primaryStage.show();
+    }
+
+    private void buyProducts() {
+        // Implement the buyProducts logic and update the textArea
+        // You can use dialogs or separate scenes for input and display
+    }
+
+    private void sellProducts() {
+        // Implement the sellProducts logic and update the textArea
+        // You can use dialogs or separate scenes for input and display
+    }
+
+    private void viewTransactionsToMarket() {
+        // Implement the viewTransactionsToMarket logic and update the textArea
+        // You can use dialogs or separate scenes for display
+    }
+
+    private void viewTransactionsFromMarket() {
+        // Implement the viewTransactionsFromMarket logic and update the textArea
+        // You can use dialogs or separate scenes for display
+    }
+
+    public Connection getConnection() throws SQLException {
+        return DriverManager.getConnection("jdbc:mysql://" + HOST + ":3306/" + DATABASE_NAME, USER, PASS);
+    }
+
+    private void handleSQLException(SQLException e) {
+        e.printStackTrace();
+        System.err.println("Database error: " + e.getMessage());
+    }
+
+    public static void main(String[] args) {
+        launch(args);
+    }
+}

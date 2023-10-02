@@ -1,0 +1,67 @@
+import javax.swing.*;
+import java.awt.*;
+
+public class view {
+    private JFrame frame;
+    private JPanel mainPanel;
+    private JComboBox<String> optionComboBox;
+    private JTextField productTextField;
+    private JTextArea outputTextArea;
+
+    public view() {
+        frame = new JFrame("Market App");
+        frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
+        frame.setSize(400, 300);
+
+        mainPanel = new JPanel();
+        mainPanel.setLayout(new GridLayout(5, 2));
+
+        JLabel optionLabel = new JLabel("Select an option:");
+        String[] options = {"Buy Products", "Sell Products"};
+        optionComboBox = new JComboBox<>(options);
+
+        JLabel productLabel = new JLabel("Enter product name:");
+        productTextField = new JTextField();
+
+        JButton submitButton = new JButton("Submit");
+
+        outputTextArea = new JTextArea();
+        outputTextArea.setEditable(false);
+
+        mainPanel.add(optionLabel);
+        mainPanel.add(optionComboBox);
+        mainPanel.add(productLabel);
+        mainPanel.add(productTextField);
+        mainPanel.add(new JLabel()); // Empty label for spacing
+        mainPanel.add(submitButton);
+        mainPanel.add(new JLabel()); // Empty label for spacing
+        mainPanel.add(new JScrollPane(outputTextArea));
+
+        frame.add(mainPanel);
+        frame.setVisible(true);
+    }
+
+    public String getSelectedOption() {
+        return optionComboBox.getSelectedItem().toString();
+    }
+
+    public String getProductInput() {
+        return productTextField.getText();
+    }
+
+    public void setOutputText(String text) {
+        outputTextArea.setText(text);
+    }
+
+    public void addActionListener(ActionListener listener) {
+        optionComboBox.addActionListener(listener);
+    }
+
+    public static void main(String[] args) {
+        SwingUtilities.invokeLater(new Runnable() {
+            public void run() {
+                new View();
+            }
+        });
+    }
+}

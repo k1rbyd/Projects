@@ -1,0 +1,127 @@
+import javax.swing.*;
+import javax.swing.table.DefaultTableModel;
+import java.awt.*;
+import java.awt.event.ActionEvent;
+import java.awt.event.ActionListener;
+
+public class View {
+    private JFrame frame;
+    private JPanel mainPanel;
+    private JComboBox<String> optionComboBox;
+    private JTextField productTextField;
+    private JTextArea outputTextArea;
+    private JTable outputTable;
+    private DefaultTableModel tableModel;
+
+    public View() {
+        frame = new JFrame("Market App");
+        frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
+        frame.setSize(400, 300);
+
+        mainPanel = new JPanel();
+        mainPanel.setLayout(new GridLayout(6, 2)); // Increased rows to 6
+
+        JLabel optionLabel = new JLabel("Select an option:");
+        String[] options = {"Buy Products", "Sell Products"};
+        optionComboBox = new JComboBox<>(options);
+
+        JLabel productLabel = new JLabel("Enter product name:");
+        productTextField = new JTextField();
+        JButton clearButton = new JButton("Clear");
+
+        JButton submitButton = new JButton("Submit");
+
+        // Initialize the table
+        tableModel = new DefaultTableModel(new Object[]{"Market", "Available Quantity", "Price"}, 0);
+        outputTable = new JTable(tableModel);
+        JScrollPane tableScrollPane = new JScrollPane(outputTable);
+
+        // Add the components to the main panel
+        mainPanel.add(optionLabel);
+        mainPanel.add(optionComboBox);
+        mainPanel.add(productLabel);
+        mainPanel.add(productTextField);
+        mainPanel.add(clearButton);
+        mainPanel.add(submitButton);
+        mainPanel.add(new JLabel()); // Empty label for spacing
+        mainPanel.add(tableScrollPane);
+
+        clearButton.addActionListener(new ActionListener() {
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                outputTextArea.setText("");
+            }
+        });
+
+        submitButton.addActionListener(new ActionListener() {
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                String selectedOption = getSelectedOption();
+                String productName = getProductInput();
+                
+                // Notify the controller about the "Submit" button click
+                if (submitActionListener != null) {
+                    submitActionListener.actionPerformed(new ActionEvent(this, ActionEvent.ACTION_PERFORMED, "SubmitClicked"));
+                }
+            }
+        });
+        
+
+
+
+        outputTextArea = new JTextArea();
+        outputTextArea.setEditable(false);
+
+        // Add the components to the main panel
+        mainPanel.add(optionLabel);
+        mainPanel.add(optionComboBox);
+        mainPanel.add(productLabel);
+        mainPanel.add(productTextField);
+        mainPanel.add(clearButton);
+        mainPanel.add(submitButton);
+        mainPanel.add(new JLabel()); // Empty label for spacing
+        mainPanel.add(tableScrollPane);
+
+        mainPanel.setLayout(new FlowLayout(FlowLayout.LEFT));
+
+        frame.add(mainPanel);
+        frame.setVisible(true);
+    }
+
+    public String getSelectedOption() {
+        return optionComboBox.getSelectedItem().toString();
+    }
+
+    public String getProductInput() {
+        String productName = productTextField.getText();
+        if (productName == null) {
+            productName = "";
+        }
+        return productName.trim();
+    }
+
+    public void setOutputText(String text) {
+        outputTextArea.setText(text);
+    }
+
+    public void setOutputTableData(Object[][] data) {
+        tableModel.setDataVector(data, new Object[]{"Market", "Available Quantity", "Price"});
+    }
+
+    public void addActionListener(ActionListener listener) {
+        optionComboBox.addActionListener(listener);
+    }
+
+    public void addSubmitActionListener(ActionListener listener) {
+        this.submitActionListener = listener;
+    }
+
+
+    public static void main(String[] args) {
+        SwingUtilities.invokeLater(new Runnable() {
+            public void run() {
+                new View();
+            }
+        });
+    }
+}

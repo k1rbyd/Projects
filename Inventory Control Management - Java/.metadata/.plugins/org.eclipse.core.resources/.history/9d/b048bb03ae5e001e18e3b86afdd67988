@@ -1,0 +1,81 @@
+import java.awt.event.ActionEvent;
+import java.awt.event.ActionListener;
+import java.sql.SQLException;
+
+public class controller {
+    private model model;
+    private view view;
+
+    public controller(model model, view view) {
+        this.model = model;
+        this.view = view;
+
+        view.addActionListener(new ActionListener() {
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                performAction();
+            }
+        });
+    }
+
+    private void performAction() {
+        String selectedOption = view.getSelectedOption();
+        String productName = view.getProductInput();
+        String result = "";
+
+        try {
+            switch (selectedOption) {
+                case "Buy Products":
+                    result = buyProducts(productName);
+                    break;
+                case "Sell Products":
+                    result = sellProducts(productName);
+                    break;
+                default:
+                    result = "Invalid option.";
+            }
+        } catch (SQLException e) {
+            result = "Database error: " + e.getMessage();
+        }
+
+        view.setOutputText(result);
+    }
+
+    private String buyProducts(String productName) throws SQLException {
+        String[] markets = {"market1", "market2", "market3"};
+        StringBuilder result = new StringBuilder("Shops where " + productName + " is available:\n------------------------\n");
+
+        for (String market : markets) {
+            int availableQuantity = model.displaymarketInfo(conn,market, productName);
+
+            if (availableQuantity > 0) {
+                result.append(market).append("\nAvailable Quantity: ").append(availableQuantity).append("\n\n");
+            }
+        }
+
+        if (result.toString().equals("Shops where " + productName + " is available:\n------------------------\n")) {
+            return "The product is not available in any shop.";
+        }
+
+        return result.toString();
+    }
+
+    private String sellProducts(String productName) throws SQLException {
+        String[] markets = {"market1", "market2", "market3"};
+        StringBuilder result = new StringBuilder("Shops where you can sell " + productName + ":\n------------------------\n");
+
+        for (String market : markets) {
+            int availableQuantity = model.displaymarketInfo(conn,market, productName);
+
+            if (availableQuantity > 0) {
+                result.append(market).append("\nAvailable Quantity: ").append(availableQuantity).append("\n\n");
+            }
+        }
+
+        if (result.toString().equals("Shops where you can sell " + productName + ":\n------------------------\n")) {
+            return "You cannot sell the product to any shop.";
+        }
+
+        return result.toString();
+    }
+}
